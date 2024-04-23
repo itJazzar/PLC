@@ -1,8 +1,6 @@
 ﻿using static System.Console;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net.NetworkInformation;
-using System.Text;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -29,6 +27,8 @@ namespace PLC
         public int TimeoutConnection { get; set; }
         public PLCTypes PLCType { get; set; }
         private ModbusClient _modbusClient;
+        private ModbusServer _modbusServer;
+        
         private CancellationTokenSource _cancellationTokenSource;
         public ModbusTag Tag { get; set; }
         public List<ModbusTag> ModbusTags = new List<ModbusTag>();
@@ -46,7 +46,6 @@ namespace PLC
             Port = port;
             IpAddress = ipAddress;
             _modbusClient = new ModbusClient();
-
             Tag = new ModbusTag(name, address, dataType);
             Tag.Address = address;
             Tag.DataType = dataType;
@@ -161,14 +160,14 @@ namespace PLC
                 WriteLine("\nDisconnestion was done successful.\n");
             }
         }
-        private bool[] ReadCoils()
+        private bool[] ReadCoils(int startingAddress, int quantity)
         {
-            var result = _modbusClient.ReadCoils(StartAddress, Quantity);
+            var result = _modbusClient.ReadCoils(startingAddress, quantity);
             return result;
         }
-        private bool[] ReadDiscreteInputs()
+        private bool[] ReadDiscreteInputs(int startingAddress, int quantity)
         {
-            var result = _modbusClient.ReadDiscreteInputs(StartAddress, Quantity);
+            var result = _modbusClient.ReadDiscreteInputs(startingAddress, quantity);
             return result;
         }
         private int[] ReadHoldingRegisters(int startingAddress, int quantity)
@@ -176,27 +175,31 @@ namespace PLC
             var result = _modbusClient.ReadHoldingRegisters(startingAddress, quantity);
             return result;
         }
-        private int[] ReadInputRegisters()
+        private int[] ReadInputRegisters(int startingAddress, int quantity)
         {
-            var result = _modbusClient.ReadInputRegisters(StartAddress, Quantity);
-            return result;
-        }
-        private int[] ReadWriteMultipleRegisters(int startingAddressRead, int quantity, int startingAddressWrite, int[] values)
-        {
-            var result = _modbusClient.ReadWriteMultipleRegisters(startingAddressRead, quantity, startingAddressWrite, values);
+            var result = _modbusClient.ReadInputRegisters(startingAddress, quantity);
             return result;
         }
         private void WriteSingleCoil(int startingAddress, bool value)
         {
             _modbusClient.WriteSingleCoil(startingAddress, value);
         }
-        private void WriteMultipleCoils(int startAddress, bool[] values)
+        private void WriteMultipleCoils(int startingAddress, bool[] values)
         {
-            _modbusClient.WriteMultipleCoils(startAddress, values);
+            _modbusClient.WriteMultipleCoils(startingAddress, values);
         }
-        private void WriteSingleRegister(int register, int value)
+        private void WriteSingleRegister(int offset, int value)
         {
-            _modbusClient.WriteSingleRegister(register, value);
+            _modbusClient.WriteSingleRegister(offset, value);
+        }  
+        private void WriteMultipleRegisters(int offset, int[] values)
+        {
+            _modbusClient.WriteMultipleRegisters(offset, values);
+        }
+        private int[] ReadWriteMultipleRegisters(int startingAddressRead, int quantity, int startingAddressWrite, int[] values)
+        {
+            var result = _modbusClient.ReadWriteMultipleRegisters(startingAddressRead, quantity, startingAddressWrite, values);
+            return result;
         }
         public override string ToString()
         {
@@ -219,9 +222,8 @@ namespace PLC
             plc.Port = 502;
             plc.PLCType = PLCTypes.Siemens;
             plc.TimeoutConnection = 1000;
-            plc.StartAddress = 0;
-            
-            plc.Quantity = 6;
+            //plc.StartAddress = 0;          
+            //plc.Quantity = 6;
             
             WriteLine(plc.ToString());
 
@@ -231,28 +233,47 @@ namespace PLC
             {
                 plc.PingPLC(100, 3000, 3000);
             });
-            
 
+            int[] regArray = { 10, 7, 15, 113, 2, 72, 34, 1, 11};
 
-            plc.WriteSingleRegister(0, 555);
+            var registers = plc.ReadWriteMultipleRegisters(0, regArray.Length, 0, regArray);
 
-            var holdRegs = plc.ReadHoldingRegisters(0, 1);
-
-            foreach (var holdReg in holdRegs)
+            for (int i = 0; i < registers.Length; i++)
             {
-                WriteLine($"Value of holding register is {holdReg}\n");
+                WriteLine($"Value of holding register {i} is {registers[i]}");
             }
 
-            for (int i = 0; i < 6; i++)
-            {
-                plc.WriteSingleCoil(i, false);
-            }
-            bool[] coils = plc.ReadCoils();
+            WriteLine();
+
+            bool[] coilsArray = { true, true, false, true, true, true, true, true, true };
+
+            plc.WriteMultipleCoils(0, coilsArray);
+
+            var coils = plc.ReadCoils(0, coilsArray.Length);
 
             for (int i = 0; i < coils.Length; i++)
             {
                 WriteLine($"Value of Coil {i} : {coils[i]}");
             }
+
+            //WriteLine();
+
+            //var discInp = plc.ReadDiscreteInputs(0, 3); //idk 3 or more
+
+            //foreach (var item in discInp)
+            //{
+            //    WriteLine(item);
+            //}
+
+            //WriteLine();
+
+            //var inpRegs = plc.ReadInputRegisters(0, 125); //125 is limit
+
+            //foreach (var item in inpRegs)
+            //{
+            //    WriteLine(item);
+            //}
+
 
             plc.Disconnect();
 
@@ -273,7 +294,6 @@ namespace PLC
         public ModbusDataType DataType { get; set; }
         public bool Value;
         public event EventHandler TagChanged;
-
         public enum ModbusDataType
         {
             Bool,         // Bit
@@ -294,7 +314,6 @@ namespace PLC
             Array,        // массив
             Struct        // структура
         }
-
         public ModbusTag(string name, int address, ModbusDataType dataType)
         {
             Name = name;
