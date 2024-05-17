@@ -325,6 +325,7 @@ namespace PLC
             Timer registerTimer = new Timer(plc.ByteOfHolgingRegisterChangedHandler, plc, TimeSpan.Zero, TimeSpan.FromSeconds(1));
             Timer tagTimer = new Timer(plc.TagChangedHandler, plc, TimeSpan.Zero, TimeSpan.FromMilliseconds(1500));
 
+
             var isTagTurnOn = plc.ReadCoils(plc.Tag.Address, 1);
 
             if (isTagTurnOn[0] == false)
@@ -346,7 +347,7 @@ namespace PLC
 
 
 
-            int[] regArray = { 10, 7, 15, 113, 2, 72, 34, 1, 11, 12, 13, 14, 66, 77 };
+            //int[] regArray = { 10, 7, 15, 113, 2, 72, 34, 1, 11, 12, 13, 14, 66, 77 };
 
             //var registers = plc.ReadWriteMultipleRegisters(0, 0, regArray);
 
